@@ -120,4 +120,8 @@ export class CartellaService {
       (cartella) => cartella.cognome.trim().toLowerCase() === normalizedSurname
     );
   }
+
+  isPagato(cartella: Cartella){
+    return(!cartella.isPreventivo && cartella.rate.length >0 && this.hasImportoGreaterThanZero(cartella) && this.calculateTotal(cartella) === 0)
+  }
 }

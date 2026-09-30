@@ -20,7 +20,7 @@ import { Cartella } from '../models/cartella.model';
     </div>
     <p>Clienti Attivi: {{ getClientiAttivi() }}</p>
     <p>Numero di preventivi: {{ getPreventivi() }}</p>
-    <button id="addClientButton" (click)="srv.addNewClient()">
+    <button id="addClientButton" (click)="aggiungiCliente()">
       Aggiungi Cliente / Preventivo
     </button>
 
@@ -34,7 +34,7 @@ import { Cartella } from '../models/cartella.model';
     <!-- Mostra le cartelle trovate -->
     <div *ngIf="cartelleTrovate && cartelleTrovate.length > 0">
       <div
-        *ngFor="let cartella of cartelleTrovate; let i = index"
+        *ngFor="let cartella of cartellePagina; let i = index"
         class="container-cartelle"
       >
         <div class="container-form">
@@ -110,16 +110,7 @@ import { Cartella } from '../models/cartella.model';
             </div>
           </ng-container>
 
-          <p
-            *ngIf="
-              srv.calculateTotal(cartella) === 0 &&
-              cartella.rate.length > 1 &&
-              srv.hasImportoGreaterThanZero(cartella)
-            "
-            style="color:red"
-          >
-            Pagato
-          </p>
+          <p *ngIf="srv.isPagato(cartella)" style="color:red">Pagato</p>
           <p *ngIf="srv.calculateTotal(cartella) !== 0">
             Totale: {{ srv.calculateTotal(cartella) }}
           </p>
@@ -143,7 +134,7 @@ import { Cartella } from '../models/cartella.model';
 
     <!-- Mostra tutte le cartelle se non è stata effettuata una ricerca -->
     <div *ngIf="cartelleTrovate.length === 0">
-      <div *ngFor="let cartella of srv.cartelle" class="container-cartelle">
+      <div *ngFor="let cartella of cartellePagina" class="container-cartelle">
         <div class="container-form">
           <div class="isAPreventive">
             <p
@@ -241,16 +232,7 @@ import { Cartella } from '../models/cartella.model';
             </div>
           </ng-container>
 
-          <p
-            *ngIf="
-              srv.calculateTotal(cartella) === 0 &&
-              cartella.rate.length > 1 &&
-              srv.hasImportoGreaterThanZero(cartella)
-            "
-            style="color:red"
-          >
-            Pagato
-          </p>
+          <p *ngIf="srv.isPagato(cartella)" style="color:red">Pagato</p>
           <p *ngIf="srv.calculateTotal(cartella) !== 0">
             Totale: {{ srv.calculateTotal(cartella) }}
           </p>
@@ -264,6 +246,12 @@ import { Cartella } from '../models/cartella.model';
           </div>
         </div>
       </div>
+    </div>
+
+    <div class="paginazione" *ngIf="totalePagine > 1">
+      <button (click)="vaiAPagina(pagina - 1)" [disabled]="pagina === 1">‹ Precedente</button>
+      <span>Pagina {{ pagina }} di {{ totalePagine }}</span>
+      <button (click)="vaiAPagina(pagina + 1)" [disabled]="pagina === totalePagine">Successiva ›</button>
     </div>
   `,
   styles: `
@@ -450,6 +438,26 @@ import { Cartella } from '../models/cartella.model';
   background-color: rgb(23, 122, 76);
 }
 
+.paginazione {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  margin: 2rem auto;
+}
+.paginazione button {
+  background-color: #0d6efd;
+  color: #fff;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 0.375rem;
+  cursor: pointer;
+}
+.paginazione button:disabled {
+  background-color: #adb5bd;
+  cursor: not-allowed;
+}
+
   `,
 })
 export class CartellaComponent {
@@ -457,12 +465,45 @@ export class CartellaComponent {
   cartelleTrovate: Cartella[] = [];
   srv = inject(CartellaService);
   ricerca: string | undefined;
+  readonly perPagina = 10;
+  paginaCorrente = 1;
 
   ngOnInit(): void {
     this.srv.loadCartelleClienti();
   }
 
+  // La lista da mostrare: i risultati della ricerca/filtro, oppure tutte le cartelle
+  get listaAttiva(): Cartella[] {
+    return this.cartelleTrovate.length > 0 ? this.cartelleTrovate : this.srv.cartelle;
+  }
+
+  get totalePagine(): number {
+    return Math.max(1, Math.ceil(this.listaAttiva.length / this.perPagina));
+  }
+
+  // Evita di restare su una pagina vuota, ad esempio dopo aver cancellato l'ultima cartella
+  get pagina(): number {
+    return Math.min(this.paginaCorrente, this.totalePagine);
+  }
+
+  get cartellePagina(): Cartella[] {
+    const inizio = (this.pagina - 1) * this.perPagina;
+    return this.listaAttiva.slice(inizio, inizio + this.perPagina);
+  }
+
+  vaiAPagina(n: number) {
+    this.paginaCorrente = Math.min(Math.max(1, n), this.totalePagine);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  aggiungiCliente() {
+    this.srv.addNewClient();
+    this.cartelleTrovate = []; // torna alla lista completa, dove c'è il nuovo cliente
+    this.vaiAPagina(this.totalePagine); // il nuovo cliente è in fondo, quindi sull'ultima pagina
+  }
+
   searchCartella() {
+    this.paginaCorrente = 1;
     const raw = this.ricerca ?? '';
     const term = raw.trim().toLowerCase(); // es. "giovanna sacco"
     const termNoSpace = term.replace(/\s+/g, ''); // es. "giovannasacco"
@@ -499,23 +540,25 @@ export class CartellaComponent {
   }
 
   resetSearch() {
+    this.paginaCorrente = 1;
     this.cartelleTrovate = [];
   }
 
   getClientiAttivi(): number {
-    return this.srv.cartelle.filter((cartella) => !cartella.isPreventivo)
-      .length;
+    return this.srv.cartelle.filter((cartella) => !cartella.isPreventivo && !this.srv.isPagato(cartella)).length;
   }
   getPreventivi(): number {
     return this.srv.cartelle.filter((cartella) => cartella.isPreventivo).length;
   }
   mostraSoloCartelle(): void {
+    this.paginaCorrente = 1;
     this.cartelleTrovate = this.srv.cartelle.filter(
       (cartella) => !cartella.isPreventivo
     );
   }
 
   mostraSoloPreventivi(): void {
+    this.paginaCorrente = 1;
     this.cartelleTrovate = this.srv.cartelle.filter(
       (cartella) => cartella.isPreventivo
     );
