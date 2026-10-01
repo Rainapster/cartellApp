@@ -1,16 +1,13 @@
 import { Component, inject } from '@angular/core';
 import { CurrencyPipe } from '@angular/common';
 import { CartellaService } from '../service/cartella.service';
-import { SpeseComponent } from './spese.component';
 import { SpesaService } from '../service/spesa.service';
 @Component({
   selector: 'app-riepilogo',
   imports: [CurrencyPipe],
   template: `
     <div class="riepilogo-container">
-      <div class="riepilogo-container">
-        <h1>Statistiche</h1>
-      </div>
+      <h1>Statistiche</h1>
       <div class="riepilogo-item">
         <h3>Totale Rate Pagate</h3>
         <p>{{ totaleRatePagate | currency }}</p>
@@ -21,7 +18,6 @@ import { SpesaService } from '../service/spesa.service';
       </div>
       <div class="riepilogo-item">
         <h3>Totale Spese</h3>
-        <p>{{ calcolaSpese() }}</p>
         <p>{{ totaleUscite | currency }}</p>
       </div>
     </div>
@@ -67,26 +63,24 @@ export class RiepilogoComponent {
 
     // Calcolo il totale delle spese
     this.srvSpese.getSpesa().subscribe((spese) => {
-      this.totaleUscite = spese.reduce((acc, spesa) => acc + spesa.importo, 0);
+      this.totaleUscite = spese.reduce((acc, spesa) => acc + Number(spesa.importo), 0);
     });
   }
 
-  calcolaSpese() {
-    this.srvSpese.getSpesa();
-  }
   calcolaTotali(): void {
-    const cartelle = this.srv.cartelle;
+    // I preventivi non sono vendite: si contano solo le cartelle vere
+    const cartelle = this.srv.cartelle.filter((cartella) => !cartella.isPreventivo);
 
     this.totaleRatePagate = cartelle.reduce((acc, cartella) => {
       return (
-        acc + cartella.rate.reduce((rateSum, rata) => rateSum + rata.importo, 0)
+        acc + cartella.rate.reduce((rateSum, rata) => rateSum + Number(rata.importo), 0)
       );
     }, 0);
 
     this.totaleMerceVenduta = cartelle.reduce((acc, cartella) => {
       return (
         acc +
-        cartella.merce.reduce((merceSum, merce) => merceSum + merce.importo, 0)
+        cartella.merce.reduce((merceSum, merce) => merceSum + Number(merce.importo), 0)
       );
     }, 0);
   }
