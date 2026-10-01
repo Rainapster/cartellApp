@@ -15,11 +15,11 @@ import { Router } from '@angular/router';
     </h3>
     <div class="button-container">
       <button class="btn preventivo-btn" (click)="preventivo()">
-        Stampa Cartella o Preventivo
+        Stampa Cartella
       </button>
     </div>
     <div class="cartella-container">
-      <app-cartella />
+      <app-cartella modalita="cartelle" />
     </div>
   `,
   styles: `

@@ -1,72 +1,44 @@
-import { CommonModule, NgIf } from '@angular/common';
-import { Component, inject } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { Component, inject, Input } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 import { CartellaService } from '../service/cartella.service';
 import { Cartella } from '../models/cartella.model';
 
 @Component({
   selector: 'app-cartella',
-  imports: [CommonModule, FormsModule, NgIf],
+  imports: [CommonModule, FormsModule],
   template: `
     <div class="search-box">
       <label>Cerca:</label>
-      <input type="text" [(ngModel)]="ricerca" />
+      <input type="text" [(ngModel)]="ricerca" (keydown.enter)="searchCartella()" />
       <button (click)="searchCartella()">Cerca</button>
     </div>
     <div class="search-box justify-content-center">
       <button (click)="resetSearch()">Mostra tutto</button>
-      <button (click)="mostraSoloCartelle()">Mostra solo cartelle</button>
-      <button (click)="mostraSoloPreventivi()">Mostra solo preventivi</button>
+      <ng-container *ngIf="!isPreventivi">
+        <button (click)="mostraClientiAttivi()">Mostra clienti attivi</button>
+        <button (click)="mostraSoloSaldati()">Mostra solo saldati</button>
+      </ng-container>
     </div>
-    <p>Clienti Attivi: {{ getClientiAttivi() }}</p>
-    <p>Numero di preventivi: {{ getPreventivi() }}</p>
+    <ng-container *ngIf="!isPreventivi">
+      <p>Clienti Attivi: {{ getClientiAttivi() }}</p>
+      <p>Clienti saldati: {{ getClientiSaldati() }}</p>
+    </ng-container>
+    <p *ngIf="isPreventivi">Numero di preventivi: {{ elenco.length }}</p>
     <button id="addClientButton" (click)="aggiungiCliente()">
-      Aggiungi Cliente / Preventivo
+      {{ isPreventivi ? 'Aggiungi Preventivo' : 'Aggiungi Cliente' }}
     </button>
 
-    <!-- <div class="search-box">
-      <label>Cerca per nome e cognome:</label>
-      <input type="text" [(ngModel)]="nomeRicerca" />
-      <input type="text" [(ngModel)]="cognomeRicercaNome" />
-      <button (click)="searchCartellaForNameAndSurname()">Cerca</button>
-    </div> -->
+    <div *ngFor="let cartella of cartellePagina" class="container-cartelle">
+      <div class="container-form">
+        <label for="nome">Nome</label>
+        <input type="text" name="nome" id="nome" [(ngModel)]="cartella.nome" />
 
-    <!-- Mostra le cartelle trovate -->
-    <div *ngIf="cartelleTrovate && cartelleTrovate.length > 0">
-      <div
-        *ngFor="let cartella of cartellePagina; let i = index"
-        class="container-cartelle"
-      >
-        <div class="container-form">
-          <div class="isAPreventive">
-            <p
-              *ngIf="cartella.isPreventivo"
-              style="color: red; font-weight: bold;"
-            >
-              Preventivo
-            </p>
-            <label>
-              <input type="checkbox" [(ngModel)]="cartella.isPreventivo" />
-              Preventivo
-            </label>
-            <p>Cliccando su Preventivo verranno eliminate le rate!</p>
-          </div>
-          <label for="nome">Nome</label>
-          <input
-            type="text"
-            name="nome"
-            id="nome"
-            [(ngModel)]="cartella.nome"
-          />
+        <label for="cognome">Cognome</label>
+        <input type="text" name="cognome" id="cognome" [(ngModel)]="cartella.cognome" />
 
-          <label for="cognome">Cognome</label>
-          <input
-            type="text"
-            name="cognome"
-            id="cognome"
-            [(ngModel)]="cartella.cognome"
-          />
-
+        <ng-container *ngIf="!isPreventivi">
           <label for="numero-cliente">Numero Cliente</label>
           <input
             type="number"
@@ -74,176 +46,69 @@ import { Cartella } from '../models/cartella.model';
             id="numero-cliente"
             [(ngModel)]="cartella.numeroCliente"
           />
-
-          <button (click)="srv.aggiungiMerce(cartella)">Aggiungi Merce</button>
-          <div
-            *ngFor="let merce of cartella.merce; let i = index"
-            class="field-merce"
-          >
-            <label>Descrizione Merce</label>
-            <input type="text" [(ngModel)]="merce.descrizione" />
-            <label>Importo</label>
-            <input type="number" [(ngModel)]="merce.importo" />
-            <button class="remove" (click)="srv.rimuoviMerce(cartella, i)">
-              Rimuovi Merce
-            </button>
-          </div>
-
-          <button
-            *ngIf="!cartella.isPreventivo"
-            (click)="srv.aggiungiRata(cartella)"
-          >
-            Aggiungi Rata
-          </button>
-          <ng-container *ngIf="!cartella.isPreventivo">
-            <div
-              *ngFor="let rata of cartella.rate; let i = index"
-              class="field-rata"
-            >
-              <label>Data Rata</label>
-              <input type="date" [(ngModel)]="rata.data" />
-              <label>Importo Rata</label>
-              <input type="number" [(ngModel)]="rata.importo" />
-              <button class="remove" (click)="srv.rimuoviRata(cartella, i)">
-                Rimuovi Rata
-              </button>
-            </div>
-          </ng-container>
-
-          <p *ngIf="srv.isPagato(cartella)" style="color:red">Pagato</p>
-          <p *ngIf="srv.calculateTotal(cartella) !== 0">
-            Totale: {{ srv.calculateTotal(cartella) }}
-          </p>
-          <div class="d-flex justify-content-between">
-            <button id="save" (click)="srv.save(cartella)">
-              {{
-                cartella.isPreventivo ? 'Salva Preventivo' : 'Salva Cartella'
-              }}
-            </button>
-            <button (click)="srv.removeClient(cartella)" class="remove">
-              {{
-                cartella.isPreventivo
-                  ? 'Cancella Preventivo'
-                  : 'Cancella Cartella'
-              }}
-            </button>
-          </div>
+        </ng-container>
+        <div class="d-flex">
+          <input
+            type="text"
+            name="tipoVia"
+            id="tipoVia"
+            [(ngModel)]="cartella.tipoVia"
+            placeholder="Via/Piazza/Contrada/Viale"
+          />
+          <input
+            type="text"
+            name="nomevia"
+            id="nomevia"
+            [(ngModel)]="cartella.nomeVia"
+            placeholder="inserisci il nome della via"
+          />
+          <input
+            type="number"
+            id="numero-via"
+            [(ngModel)]="cartella.numeroVia"
+            placeholder="Inserisci il numero civico"
+          />
         </div>
-      </div>
-    </div>
 
-    <!-- Mostra tutte le cartelle se non è stata effettuata una ricerca -->
-    <div *ngIf="cartelleTrovate.length === 0">
-      <div *ngFor="let cartella of cartellePagina" class="container-cartelle">
-        <div class="container-form">
-          <div class="isAPreventive">
-            <p
-              *ngIf="cartella.isPreventivo"
-              style="color: red; font-weight: bold;"
-            >
-              Preventivo
-            </p>
-            <label>
-              <input type="checkbox" [(ngModel)]="cartella.isPreventivo" />
-              Preventivo
-            </label>
-            <p>Cliccando su Preventivo verranno eliminate le rate!</p>
-          </div>
-
-          <label for="nome">Nome</label>
-          <input
-            type="text"
-            name="nome"
-            id="nome"
-            [(ngModel)]="cartella.nome"
-          />
-
-          <label for="cognome">Cognome</label>
-          <input
-            type="text"
-            name="cognome"
-            id="cognome"
-            [(ngModel)]="cartella.cognome"
-          />
-
-          <label for="numero-cliente">Numero Cliente</label>
-          <input
-            type="text"
-            name="numero-cliente"
-            id="numero-cliente"
-            [(ngModel)]="cartella.numeroCliente"
-          />
-          <div class="d-flex">
-            <input
-              type="text"
-              name="tipoVia"
-              id="tipoVia"
-              [(ngModel)]="cartella.tipoVia"
-              placeholder="Via/Piazza/Contrada/Viale"
-            />
-
-            <input
-              type="text"
-              name="nomevia"
-              id="nomevia"
-              [(ngModel)]="cartella.nomeVia"
-              placeholder="inserisci il nome della via"
-            />
-            <input
-              type="number"
-              id="numero-via"
-              [(ngModel)]="cartella.numeroVia"
-              placeholder="Inserisci il numero civico"
-            />
-          </div>
-
-          <button (click)="srv.aggiungiMerce(cartella)">Aggiungi Merce</button>
-          <div
-            *ngFor="let merce of cartella.merce; let i = index"
-            class="field-merce"
-          >
-            <label>Descrizione Merce</label>
-            <input type="text" [(ngModel)]="merce.descrizione" />
-            <label>Importo</label>
-            <input type="number" [(ngModel)]="merce.importo" />
-            <button class="remove" (click)="srv.rimuoviMerce(cartella, i)">
-              Rimuovi merce
-            </button>
-          </div>
-
-          <button
-            *ngIf="!cartella.isPreventivo"
-            (click)="srv.aggiungiRata(cartella)"
-          >
-            Aggiungi Rata
+        <button (click)="srv.aggiungiMerce(cartella)">Aggiungi Merce</button>
+        <div *ngFor="let merce of cartella.merce; let i = index" class="field-merce">
+          <label>Descrizione Merce</label>
+          <input type="text" [(ngModel)]="merce.descrizione" />
+          <label>Importo</label>
+          <input type="number" [(ngModel)]="merce.importo" />
+          <button class="remove" (click)="srv.rimuoviMerce(cartella, i)">
+            Rimuovi Merce
           </button>
-          <ng-container *ngIf="!cartella.isPreventivo">
-            <div
-              *ngFor="let rata of cartella.rate; let i = index"
-              class="field-rata"
-            >
-              <label for="rateImporto{{ i }}">Importo Rate</label>
-              <input type="number" [(ngModel)]="rata.importo" />
-              <label for="rateData{{ i }}">Data Rate</label>
-              <input type="date" [(ngModel)]="rata.data" />
-              <button class="remove" (click)="srv.rimuoviRata(cartella, i)">
-                Rimuovi Rata
-              </button>
-            </div>
-          </ng-container>
+        </div>
 
-          <p *ngIf="srv.isPagato(cartella)" style="color:red">Pagato</p>
-          <p *ngIf="srv.calculateTotal(cartella) !== 0">
-            Totale: {{ srv.calculateTotal(cartella) }}
-          </p>
-          <div class="d-flex justify-content-between">
-            <button id="save" (click)="srv.save(cartella)">
-              Salva Cartella
-            </button>
-            <button (click)="srv.removeClient(cartella)" class="remove">
-              Rimuovi Cliente
+        <ng-container *ngIf="!isPreventivi">
+          <button (click)="srv.aggiungiRata(cartella)">Aggiungi Rata</button>
+          <div *ngFor="let rata of cartella.rate; let i = index" class="field-rata">
+            <label>Data Rata</label>
+            <input type="date" [(ngModel)]="rata.data" />
+            <label>Importo Rata</label>
+            <input type="number" [(ngModel)]="rata.importo" />
+            <button class="remove" (click)="srv.rimuoviRata(cartella, i)">
+              Rimuovi Rata
             </button>
           </div>
+          <p *ngIf="srv.isPagato(cartella)" style="color:red">Pagato</p>
+        </ng-container>
+
+        <p *ngIf="srv.calculateTotal(cartella) !== 0">
+          Totale: {{ srv.calculateTotal(cartella) | currency }}
+        </p>
+        <div class="d-flex justify-content-between">
+          <button id="save" (click)="srv.save(cartella)">
+            {{ isPreventivi ? 'Salva Preventivo' : 'Salva Cartella' }}
+          </button>
+          <button *ngIf="cartella._id" (click)="stampa(cartella)">Stampa</button>
+          <button *ngIf="isPreventivi" (click)="converti(cartella)">
+            Converti in cartella
+          </button>
+          <button (click)="srv.removeClient(cartella)" class="remove">
+            {{ isPreventivi ? 'Cancella Preventivo' : 'Cancella Cartella' }}
+          </button>
         </div>
       </div>
     </div>
@@ -374,41 +239,10 @@ import { Cartella } from '../models/cartella.model';
 }
 
 
-.isAPreventive {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  margin-bottom: 1rem;
-  padding: 1rem;
-  background-color: #f8d7da; 
-  border: 1px solid #f5c2c7; 
-  border-radius: 0.375rem;
-}
-
-.isAPreventive p {
-  font-size: 1.25rem;
-  font-weight: bold;
-  color: #842029; 
-  margin: 0;
-}
 
 
-.isAPreventive label {
-  display: flex;
-  gap: 0.5rem;
-  font-size: 1rem;
-  font-weight: 500;
-  color: #842029; 
-}
 
-.isAPreventive input[type='checkbox'] {
-  width: 1.25rem;
-  height: 1.25rem;
-  cursor: pointer;
-  accent-color: #842029;
-}
+
 #save{
   background-color:  #198754;
   transition: background-color 0.2s ease
@@ -461,20 +295,28 @@ import { Cartella } from '../models/cartella.model';
   `,
 })
 export class CartellaComponent {
-  numeroCartella: number | undefined;
+  // 'cartelle' in home, 'preventivi' nella pagina Preventivi
+  @Input() modalita: 'cartelle' | 'preventivi' = 'cartelle';
+
   cartelleTrovate: Cartella[] = [];
   srv = inject(CartellaService);
+  private router = inject(Router);
   ricerca: string | undefined;
   readonly perPagina = 10;
   paginaCorrente = 1;
 
-  ngOnInit(): void {
-    this.srv.loadCartelleClienti();
+  get isPreventivi(): boolean {
+    return this.modalita === 'preventivi';
   }
 
-  // La lista da mostrare: i risultati della ricerca/filtro, oppure tutte le cartelle
+  // Solo le cartelle o solo i preventivi, a seconda della pagina
+  get elenco(): Cartella[] {
+    return this.srv.cartelle.filter((cartella) => !!cartella.isPreventivo === this.isPreventivi);
+  }
+
+  // La lista da mostrare: i risultati della ricerca/filtro, oppure tutto l'elenco
   get listaAttiva(): Cartella[] {
-    return this.cartelleTrovate.length > 0 ? this.cartelleTrovate : this.srv.cartelle;
+    return this.cartelleTrovate.length > 0 ? this.cartelleTrovate : this.elenco;
   }
 
   get totalePagine(): number {
@@ -497,9 +339,27 @@ export class CartellaComponent {
   }
 
   aggiungiCliente() {
-    this.srv.addNewClient();
+    this.srv.addNewClient(this.isPreventivi);
     this.cartelleTrovate = []; // torna alla lista completa, dove c'è il nuovo cliente
     this.vaiAPagina(this.totalePagine); // il nuovo cliente è in fondo, quindi sull'ultima pagina
+  }
+
+  stampa(cartella: Cartella) {
+    this.router.navigate(['/search'], { queryParams: { id: cartella._id } });
+  }
+
+  converti(preventivo: Cartella) {
+    const risposta = prompt('Numero cliente da assegnare alla nuova cartella:');
+    if (risposta === null) return; // annullato
+    const numero = Number(risposta);
+    if (!risposta.trim() || !Number.isInteger(numero) || numero <= 0) {
+      alert('Inserisci un numero cliente valido');
+      return;
+    }
+    if (this.srv.convertiInCartella(preventivo, numero)) {
+      // il preventivo è diventato una cartella: lo tolgo anche dai risultati mostrati qui
+      this.cartelleTrovate = this.cartelleTrovate.filter((c) => c !== preventivo);
+    }
   }
 
   searchCartella() {
@@ -508,8 +368,7 @@ export class CartellaComponent {
     const term = raw.trim().toLowerCase(); // es. "giovanna sacco"
     const termNoSpace = term.replace(/\s+/g, ''); // es. "giovannasacco"
 
-    // 2) Filtro
-    const results = this.srv.cartelle.filter((cartella) => {
+    const results = this.elenco.filter((cartella) => {
       const nome = (cartella.nome ?? '').trim().toLowerCase();
       const cognome = (cartella.cognome ?? '').trim().toLowerCase();
 
@@ -527,14 +386,14 @@ export class CartellaComponent {
         // cognome+nome senza spazi: "saccogiovanna"
         `${cognome}${nome}` === termNoSpace ||
         //ricerca per numero cliente
-        this.ricerca === cartella.numeroCliente.toString()
+        (!this.isPreventivi && raw.trim() === String(cartella.numeroCliente))
       );
     });
 
     if (results.length > 0) {
       this.cartelleTrovate = results;
     } else {
-      alert('Nessuna cartella trovata con i criteri inseriti.');
+      alert('Nessun risultato trovato con i criteri inseriti.');
       this.cartelleTrovate = [];
     }
   }
@@ -545,22 +404,30 @@ export class CartellaComponent {
   }
 
   getClientiAttivi(): number {
-    return this.srv.cartelle.filter((cartella) => !cartella.isPreventivo && !this.srv.isPagato(cartella)).length;
+    return this.elenco.filter((cartella) => !this.srv.isPagato(cartella)).length;
   }
-  getPreventivi(): number {
-    return this.srv.cartelle.filter((cartella) => cartella.isPreventivo).length;
+
+  getClientiSaldati(): number {
+    return this.elenco.filter((cartella) => this.srv.isPagato(cartella)).length;
   }
-  mostraSoloCartelle(): void {
-    this.paginaCorrente = 1;
-    this.cartelleTrovate = this.srv.cartelle.filter(
-      (cartella) => !cartella.isPreventivo
+
+  mostraClientiAttivi(): void {
+    this.mostraFiltrati(
+      this.elenco.filter((cartella) => !this.srv.isPagato(cartella)),
+      'Nessun cliente attivo.'
     );
   }
 
-  mostraSoloPreventivi(): void {
-    this.paginaCorrente = 1;
-    this.cartelleTrovate = this.srv.cartelle.filter(
-      (cartella) => cartella.isPreventivo
+  mostraSoloSaldati(): void {
+    this.mostraFiltrati(
+      this.elenco.filter((cartella) => this.srv.isPagato(cartella)),
+      'Nessun cliente saldato.'
     );
+  }
+
+  private mostraFiltrati(risultati: Cartella[], messaggioVuoto: string) {
+    this.paginaCorrente = 1;
+    this.cartelleTrovate = risultati;
+    if (risultati.length === 0) alert(messaggioVuoto);
   }
 }

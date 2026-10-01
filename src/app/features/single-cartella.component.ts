@@ -3,7 +3,7 @@ import { Component, inject, ViewChild, ElementRef } from '@angular/core';
 import { CartellaService } from '../service/cartella.service';
 import { Cartella } from '../models/cartella.model';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 // @ts-ignore
 import html2pdf from 'html2pdf.js';
 
@@ -166,6 +166,15 @@ export class SingleCartellaComponent {
   cartellaTrovata?: Cartella;
   prv = inject(CartellaService);
   rooter = inject(Router);
+  private route = inject(ActivatedRoute);
+
+  ngOnInit(): void {
+    // Aperta dal pulsante "Stampa" di una scheda: /search?id=...
+    const id = this.route.snapshot.queryParamMap.get('id');
+    if (id) {
+      this.cartellaTrovata = this.prv.cartelle.find((c) => c._id === id);
+    }
+  }
 
   search() {
     const result = this.prv.findByNumero(this.numeroRicerca);
@@ -178,7 +187,7 @@ export class SingleCartellaComponent {
     }
   }
   goBack() {
-    this.rooter.navigate(['/home']);
+    this.rooter.navigate([this.cartellaTrovata?.isPreventivo ? '/preventivi' : '/home']);
   }
   calculateTotal(cartella: Cartella): number {
     return this.prv.calculateTotal(cartella);

@@ -21,18 +21,42 @@ export class CartellaService {
 
   // I dati vengono caricati dal file al login, qui non serve più fare nulla
   loadCartelleClienti() {}
-  addNewClient() {
+  addNewClient(isPreventivo = false) {
     const newClient: Cartella = {
       nome: '',
       cognome: '',
       numeroCliente: 0,
-      tipoVia: '', 
-      nomeVia: '', 
+      tipoVia: '',
+      nomeVia: '',
       numeroVia: 0,
       merce: [],
       rate: [],
+      isPreventivo,
     };
     this.cartelle.push(newClient);
+  }
+
+  // Un numero cliente può appartenere a una sola cartella (i preventivi non contano)
+  numeroGiaUsato(numero: number, escludi: Cartella): boolean {
+    return this.cartelle.some(
+      (c) =>
+        c !== escludi &&
+        c._id &&
+        c._id !== escludi._id &&
+        !c.isPreventivo &&
+        Number(c.numeroCliente) === Number(numero)
+    );
+  }
+
+  convertiInCartella(preventivo: Cartella, numeroCliente: number): boolean {
+    if (this.numeroGiaUsato(numeroCliente, preventivo)) {
+      alert('Esiste già un cliente con questo numero');
+      return false;
+    }
+    preventivo.isPreventivo = false;
+    preventivo.numeroCliente = numeroCliente;
+    this.save(preventivo);
+    return true;
   }
 
   removeClient(cartella: Cartella) {
@@ -44,17 +68,7 @@ export class CartellaService {
   }
   save(cartella: Cartella) {
     // Sostituisce il vincolo "unique" che prima faceva MongoDB
-    const duplicato =
-      !cartella.isPreventivo &&
-      this.cartelle.some(
-        (c) =>
-          c !== cartella &&
-          c._id &&
-          c._id !== cartella._id &&
-          !c.isPreventivo &&
-          Number(c.numeroCliente) === Number(cartella.numeroCliente)
-      );
-    if (duplicato) {
+    if (!cartella.isPreventivo && this.numeroGiaUsato(cartella.numeroCliente, cartella)) {
       alert('Esiste già un cliente con questo numero');
       return;
     }
@@ -90,10 +104,9 @@ export class CartellaService {
     cartella.rate.splice(index, 1);
   }
   calculateTotal(cartella: Cartella): number {
-    if(cartella.isPreventivo){
-      cartella.rate.splice(0, cartella.rate.length)
-    }
-    const totalRata = cartella.rate.reduce(
+    // Un preventivo non ha pagamenti: le rate si ignorano, senza cancellarle
+    const rate = cartella.isPreventivo ? [] : cartella.rate;
+    const totalRata = rate.reduce(
       (total, rata) => (total += Number(rata.importo)),
       0
     );
@@ -107,8 +120,10 @@ export class CartellaService {
     return cartella.rate.some((rata) => rata.importo > 0);
   }
   findByNumero(identificativoCliente: number) {
+    // I preventivi non hanno numero cliente: si stampano dal pulsante "Stampa" della scheda
     return this.cartelle.find(
-      (cartella) => cartella.numeroCliente === identificativoCliente
+      (cartella) =>
+        !cartella.isPreventivo && Number(cartella.numeroCliente) === Number(identificativoCliente)
     );
   }
   goToSearch() {

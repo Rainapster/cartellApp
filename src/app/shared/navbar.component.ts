@@ -15,6 +15,9 @@ import { AuthService } from '../service/auth.service';
       <a class="nav-link me-1" routerLink="/home" routerLinkActive="active"
         >Home</a
       >
+      <a class="nav-link me-1" routerLink="/preventivi" routerLinkActive="active"
+        >Preventivi</a
+      >
       <a class="nav-link me-1" routerLink="/riepilogo" routerLinkActive="active"
         >Statistiche</a
       >
