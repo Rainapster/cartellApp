@@ -15,11 +15,8 @@ import { Cartella } from '../models/cartella.model';
       <button (click)="searchCartella()">Cerca</button>
     </div>
     <div class="search-box justify-content-center">
-      <button (click)="resetSearch()">Mostra tutto</button>
-      <ng-container *ngIf="!isPreventivi">
-        <button (click)="mostraClientiAttivi()">Mostra clienti attivi</button>
-        <button (click)="mostraSoloSaldati()">Mostra solo saldati</button>
-      </ng-container>
+      <button (click)="resetSearch()">{{ isPreventivi ? 'Mostra tutto' : 'Mostra attivi' }}</button>
+      <button *ngIf="!isPreventivi" (click)="mostraSoloSaldati()">Mostra saldati</button>
     </div>
     <ng-container *ngIf="!isPreventivi">
       <p>Clienti Attivi: {{ getClientiAttivi() }}</p>
@@ -316,7 +313,8 @@ export class CartellaComponent {
 
   // La lista da mostrare: i risultati della ricerca/filtro, oppure tutto l'elenco
   get listaAttiva(): Cartella[] {
-    return this.cartelleTrovate.length > 0 ? this.cartelleTrovate : this.elenco;
+    if(this.cartelleTrovate.length >0 ) return this.cartelleTrovate;
+    return this.elenco.filter((cartella)=>!this.srv.isPagato(cartella))
   }
 
   get totalePagine(): number {
