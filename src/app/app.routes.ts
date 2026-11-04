@@ -5,6 +5,7 @@ import { SingleCartellaComponent } from './features/single-cartella.component';
 import { RiepilogoComponent } from './features/riepilogo.component';
 import { SpeseComponent } from './features/spese.component';
 import { PreventiviComponent } from './features/preventivi.component';
+import { InventarioComponent } from './features/inventario.component';
 import { authGuard } from './service/auth.guard';
 
 export const routes: Routes = [
@@ -14,5 +15,6 @@ export const routes: Routes = [
   { path: 'search', component: SingleCartellaComponent, canActivate: [authGuard] },
   { path: 'riepilogo', component: RiepilogoComponent, canActivate: [authGuard] },
   { path: 'spese', component: SpeseComponent, canActivate: [authGuard] },
+  { path: 'magazzino', component: InventarioComponent, canActivate: [authGuard] },
   { path: '**', redirectTo: 'login' },
 ];

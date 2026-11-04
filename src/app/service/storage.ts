@@ -2,10 +2,14 @@ import { Injectable } from '@angular/core';
 import { get, set } from 'idb-keyval';
 import { Cartella } from '../models/cartella.model';
 import { Spesa } from '../models/spesa.model';
+import { Articolo } from '../models/articolo.model';
 
 export interface AppData {
   cartelle: Cartella[];
   spese: Spesa[];
+  inventario: Articolo[];
+  ricaricoDefault: number; // ricarico % applicato a tutti gli articoli salvo override
+  ivaInclusa: boolean; // se true, il prezzo di vendita include il 22% di IVA
 }
 
 const HANDLE_KEY = 'cartellapp-file';
@@ -27,7 +31,13 @@ export interface BackupEntry {
   providedIn: 'root',
 })
 export class StorageService {
-  data: AppData = { cartelle: [], spese: [] };
+  data: AppData = {
+    cartelle: [],
+    spese: [],
+    inventario: [],
+    ricaricoDefault: 0,
+    ivaInclusa: false,
+  };
   private handle: FileSystemFileHandle | null = null;
 
   get hasFile() {
@@ -62,7 +72,13 @@ export class StorageService {
     });
     this.handle = h;
     await set(HANDLE_KEY, h);
-    this.data = { cartelle: [], spese: [] };
+    this.data = {
+      cartelle: [],
+      spese: [],
+      inventario: [],
+      ricaricoDefault: 0,
+      ivaInclusa: false,
+    };
     await this.save();
     return true;
   }
@@ -101,7 +117,13 @@ export class StorageService {
   // aperto (es. l'originale è corrotto), chiede dove salvarli.
   async restoreBackup(entry: BackupEntry): Promise<void> {
     const parsed = JSON.parse(entry.json);
-    this.data = { cartelle: parsed.cartelle ?? [], spese: parsed.spese ?? [] };
+    this.data = {
+      cartelle: parsed.cartelle ?? [],
+      spese: parsed.spese ?? [],
+      inventario: parsed.inventario ?? [],
+      ricaricoDefault: parsed.ricaricoDefault ?? 0,
+      ivaInclusa: parsed.ivaInclusa ?? false,
+    };
     if (!this.handle) {
       const h = await window.showSaveFilePicker({
         suggestedName: 'cartellapp-dati.json',
@@ -118,6 +140,9 @@ export class StorageService {
     const daSalvare: AppData = {
       cartelle: this.data.cartelle.filter((c) => c._id),
       spese: this.data.spese,
+      inventario: this.data.inventario,
+      ricaricoDefault: this.data.ricaricoDefault,
+      ivaInclusa: this.data.ivaInclusa,
     };
     return JSON.stringify(daSalvare, null, 2);
   }
@@ -170,7 +195,13 @@ export class StorageService {
   private async useFile(h: FileSystemFileHandle) {
     const text = await (await h.getFile()).text();
     const parsed = text.trim() ? JSON.parse(text) : {};
-    this.data = { cartelle: parsed.cartelle ?? [], spese: parsed.spese ?? [] };
+    this.data = {
+      cartelle: parsed.cartelle ?? [],
+      spese: parsed.spese ?? [],
+      inventario: parsed.inventario ?? [],
+      ricaricoDefault: parsed.ricaricoDefault ?? 0,
+      ivaInclusa: parsed.ivaInclusa ?? false,
+    };
     this.handle = h;
     await set(HANDLE_KEY, h);
     await this.backup(); // snapshot dello stato appena aperto, prima delle modifiche

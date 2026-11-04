@@ -25,6 +25,9 @@ import { StorageService } from '../service/storage';
       <a class="nav-link me-1" routerLink="/spese" routerLinkActive="active"
         >Spese</a
       >
+      <a class="nav-link me-1" routerLink="/magazzino" routerLinkActive="active"
+        >Magazzino</a
+      >
       <button class="btn logout-btn" (click)="logout()">Logout</button>
     </nav>
   `,
