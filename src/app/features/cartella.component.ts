@@ -423,6 +423,7 @@ export class CartellaComponent {
     );
   }
 
+
   private mostraFiltrati(risultati: Cartella[], messaggioVuoto: string) {
     this.paginaCorrente = 1;
     this.cartelleTrovate = risultati;
