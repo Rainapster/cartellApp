@@ -3,7 +3,14 @@ import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { AuthService } from '../service/auth.service';
-import { StorageService } from '../service/storage';
+import { StorageService, BackupEntry } from '../service/storage';
+
+interface BackupVista {
+  entry: BackupEntry;
+  data: string;
+  cartelle: number;
+  spese: number;
+}
 
 @Component({
   selector: 'app-login',
@@ -21,6 +28,20 @@ import { StorageService } from '../service/storage';
         <button *ngIf="savedFileName" (click)="reconnect()">Apri {{ savedFileName }}</button>
         <button (click)="openFile()">Apri un altro file</button>
         <button (click)="createFile()">Crea nuovo file</button>
+        <button class="secondary" (click)="toggleBackups()">
+          {{ mostraBackup ? 'Nascondi backup' : 'Ripristina da backup' }}
+        </button>
+
+        <div *ngIf="mostraBackup" class="backup-list">
+          <p *ngIf="backups.length === 0" class="text-muted">Nessun backup disponibile.</p>
+          <div *ngFor="let b of backups" class="backup-item">
+            <div class="backup-info">
+              <strong>{{ b.data | date : 'dd/MM/yyyy HH:mm' }}</strong>
+              <small>{{ b.cartelle }} cartelle · {{ b.spese }} spese</small>
+            </div>
+            <button (click)="ripristina(b)">Ripristina</button>
+          </div>
+        </div>
       </div>
       <p *ngIf="errorMessage" class="text-danger">{{ errorMessage }}</p>
     </div>
@@ -39,6 +60,29 @@ import { StorageService } from '../service/storage';
     width: 300px;
     height:auto;
   }
+  .secondary{
+    background:#6c757d;
+  }
+  .backup-list{
+    margin-top: 0.75rem;
+    border-top: 1px solid #dee2e6;
+    padding-top: 0.5rem;
+  }
+  .backup-item{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:0.5rem;
+    padding:0.4rem 0;
+    border-bottom:1px solid #f1f3f5;
+  }
+  .backup-info{
+    display:flex;
+    flex-direction:column;
+  }
+  .backup-info small{
+    color:#6c757d;
+  }
   `,
 })
 export class LoginComponent implements OnInit {
@@ -50,6 +94,8 @@ export class LoginComponent implements OnInit {
   password: string = '';
   errorMessage: string | null = null;
   savedFileName: string | null = null;
+  mostraBackup = false;
+  backups: BackupVista[] = [];
 
   async ngOnInit() {
     this.savedFileName = await this.storage.savedFileName();
@@ -72,6 +118,36 @@ export class LoginComponent implements OnInit {
   }
   createFile() {
     return this.run(() => this.storage.createFile());
+  }
+
+  async toggleBackups() {
+    this.mostraBackup = !this.mostraBackup;
+    if (this.mostraBackup) {
+      const entries = await this.storage.listBackups();
+      this.backups = entries.map((entry) => {
+        let cartelle = 0;
+        let spese = 0;
+        try {
+          const dati = JSON.parse(entry.json);
+          cartelle = dati.cartelle?.length ?? 0;
+          spese = dati.spese?.length ?? 0;
+        } catch {
+          // backup illeggibile: lo mostro comunque con conteggi a 0
+        }
+        return { entry, data: entry.date, cartelle, spese };
+      });
+    }
+  }
+
+  ripristina(b: BackupVista) {
+    const quando = new Date(b.entry.date).toLocaleString('it-IT');
+    if (!confirm(`Ripristinare il backup del ${quando}? I dati attuali verranno sostituiti.`)) {
+      return;
+    }
+    return this.run(async () => {
+      await this.storage.restoreBackup(b.entry);
+      return true;
+    });
   }
 
   private async run(action: () => Promise<boolean>) {

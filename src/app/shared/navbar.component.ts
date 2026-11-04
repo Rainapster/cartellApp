@@ -2,6 +2,7 @@ import { Component, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { AuthService } from '../service/auth.service';
+import { StorageService } from '../service/storage';
 
 @Component({
   selector: 'app-navbar',
@@ -58,7 +59,9 @@ import { AuthService } from '../service/auth.service';
 export class NavbarComponent {
   router = inject(Router);
   auth = inject(AuthService);
-  logout() {
+  private storage = inject(StorageService);
+  async logout() {
+    await this.storage.backup(); // copia di sicurezza prima di uscire
     this.auth.logout();
     this.router.navigate(['login']);
   }

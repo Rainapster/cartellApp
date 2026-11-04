@@ -20,7 +20,7 @@ import { Cartella } from '../models/cartella.model';
     </div>
     <ng-container *ngIf="!isPreventivi">
       <p>Clienti Attivi: {{ getClientiAttivi() }}</p>
-      <p>Clienti saldati: {{ getClientiSaldati() }}</p>
+      <p>Clienti Saldati: {{ getClientiSaldati() }}</p>
     </ng-container>
     <p *ngIf="isPreventivi">Numero di preventivi: {{ elenco.length }}</p>
     <button id="addClientButton" (click)="aggiungiCliente()">
