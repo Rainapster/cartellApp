@@ -4,6 +4,7 @@ import { Merce } from '../models/merce.model';
 import { Rate } from '../models/rate.model';
 import { Router } from '@angular/router';
 import { StorageService } from './storage';
+import { differenzaEuro, sommaEuro } from './money';
 
 @Injectable({
   providedIn: 'root',
@@ -106,15 +107,10 @@ export class CartellaService {
   calculateTotal(cartella: Cartella): number {
     // Un preventivo non ha pagamenti: le rate si ignorano, senza cancellarle
     const rate = cartella.isPreventivo ? [] : cartella.rate;
-    const totalRata = rate.reduce(
-      (total, rata) => (total += Number(rata.importo)),
-      0
-    );
-    const totalMerce = cartella.merce.reduce(
-      (acc, importo) => (acc += Number(importo.importo)),
-      0
-    );
-    return totalMerce - totalRata;
+    // Calcolo in centesimi interi: così il totale è esatto e "=== 0" funziona
+    const totalRata = sommaEuro(rate, (r) => r.importo);
+    const totalMerce = sommaEuro(cartella.merce, (m) => m.importo);
+    return differenzaEuro(totalMerce, totalRata);
   }
   hasImportoGreaterThanZero(cartella: Cartella): boolean {
     return cartella.rate.some((rata) => rata.importo > 0);

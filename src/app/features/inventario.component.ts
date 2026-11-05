@@ -3,6 +3,7 @@ import { CommonModule, CurrencyPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Articolo } from '../models/articolo.model';
 import { InventarioService, RigaAcquisto } from '../service/inventario.service';
+import { sommaEuro } from '../service/money';
 
 @Component({
   selector: 'app-inventario',
@@ -110,8 +111,20 @@ Tavolo; 2; 120"></textarea>
           Includi IVA {{ srv.aliquotaIva }}% nel prezzo di vendita
         </label>
 
+        <div class="cerca-articoli" *ngIf="srv.articoli.length > 0">
+          <input
+            type="text"
+            [(ngModel)]="filtroArticoli"
+            placeholder="Cerca articolo per descrizione…"
+          />
+          <button *ngIf="filtroArticoli" class="ghost" (click)="filtroArticoli = ''">✕</button>
+        </div>
+
         <p *ngIf="srv.articoli.length === 0" class="hint">Nessun articolo in magazzino.</p>
-        <div class="tabella-scroll" *ngIf="srv.articoli.length > 0">
+        <p *ngIf="srv.articoli.length > 0 && articoliFiltrati().length === 0" class="hint">
+          Nessun articolo corrisponde a «{{ filtroArticoli }}».
+        </p>
+        <div class="tabella-scroll" *ngIf="articoliFiltrati().length > 0">
           <table>
             <thead>
               <tr>
@@ -125,7 +138,7 @@ Tavolo; 2; 120"></textarea>
               </tr>
             </thead>
             <tbody>
-              <tr *ngFor="let a of srv.articoli" [class.esaurito]="a.quantita <= 0">
+              <tr *ngFor="let a of articoliFiltrati()" [class.esaurito]="a.quantita <= 0">
                 <td><input type="text" [(ngModel)]="a.descrizione" (change)="salva()" /></td>
                 <td>
                   <input type="number" [(ngModel)]="a.quantita" min="0" (change)="salva()" class="q" />
@@ -272,6 +285,8 @@ Tavolo; 2; 120"></textarea>
   }
   .iva-toggle input { width: auto; }
 
+  .cerca-articoli { display: flex; gap: 0.5rem; margin: 0.5rem 0 1rem; }
+  .cerca-articoli input { flex: 1; }
   .tabella-scroll { overflow-x: auto; }
   table { width: 100%; border-collapse: collapse; margin-top: 0.5rem; }
   th, td { padding: 0.4rem; text-align: left; border-bottom: 1px solid #f1f3f5; white-space: nowrap; }
@@ -293,6 +308,14 @@ export class InventarioComponent {
   ivaPercent = 22; // usata per calcolare la spesa negli acquisti manuali
   // Totale reale letto dalla fattura XML: se valorizzato, è l'importo della spesa
   totaleFatturaImport: number | null = null;
+  filtroArticoli = ''; // ricerca nella tabella del magazzino
+
+  // Articoli del magazzino filtrati per descrizione (ricerca "contiene")
+  articoliFiltrati(): Articolo[] {
+    const q = this.filtroArticoli.trim().toLowerCase();
+    if (!q) return this.srv.articoli;
+    return this.srv.articoli.filter((a) => a.descrizione.toLowerCase().includes(q));
+  }
 
   private rigaVuota(): RigaAcquisto {
     return { descrizione: '', quantita: 0, costoUnitario: 0 };
@@ -318,10 +341,7 @@ export class InventarioComponent {
   }
 
   totaleAcquisto(): number {
-    return this.righe.reduce(
-      (acc, r) => acc + Number(r.quantita) * Number(r.costoUnitario),
-      0
-    );
+    return sommaEuro(this.righe, (r) => Number(r.quantita) * Number(r.costoUnitario));
   }
 
   // Trasforma il testo incollato in righe. Separatori ammessi: tab, ; o ,
@@ -400,10 +420,7 @@ export class InventarioComponent {
   }
 
   valoreMagazzino(): number {
-    return this.srv.articoli.reduce(
-      (acc, a) => acc + Number(a.quantita) * Number(a.costoUnitario),
-      0
-    );
+    return sommaEuro(this.srv.articoli, (a) => Number(a.quantita) * Number(a.costoUnitario));
   }
 
   // Converte "25,50", "1.250,00" o "25.50" in numero.
