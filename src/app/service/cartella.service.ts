@@ -49,15 +49,14 @@ export class CartellaService {
     );
   }
 
-  convertiInCartella(preventivo: Cartella, numeroCliente: number): boolean {
+  async convertiInCartella(preventivo: Cartella, numeroCliente: number): Promise<boolean> {
     if (this.numeroGiaUsato(numeroCliente, preventivo)) {
       alert('Esiste già un cliente con questo numero');
       return false;
     }
     preventivo.isPreventivo = false;
     preventivo.numeroCliente = numeroCliente;
-    this.save(preventivo);
-    return true;
+    return this.save(preventivo);
   }
 
   removeClient(cartella: Cartella) {
@@ -67,11 +66,12 @@ export class CartellaService {
       .then(() => alert('Cliente rimosso con successo'))
       .catch((err) => alert('Errore durante la rimozione del cliente: ' + err.message));
   }
-  save(cartella: Cartella) {
+  // Ritorna true se la cartella è stata effettivamente scritta nel file
+  async save(cartella: Cartella): Promise<boolean> {
     // Sostituisce il vincolo "unique" che prima faceva MongoDB
     if (!cartella.isPreventivo && this.numeroGiaUsato(cartella.numeroCliente, cartella)) {
       alert('Esiste già un cliente con questo numero');
-      return;
+      return false;
     }
     const nuova = !cartella._id;
     if (nuova) cartella._id = crypto.randomUUID();
@@ -79,10 +79,14 @@ export class CartellaService {
     if (i >= 0) this.cartelle[i] = cartella;
     else this.cartelle.push(cartella);
 
-    this.storage
-      .save()
-      .then(() => alert(nuova ? 'Cartella salvata con successo' : 'cartella aggiornata'))
-      .catch((err) => alert('Errore durante il salvataggio della cartella: ' + err.message));
+    try {
+      await this.storage.save();
+      alert(nuova ? 'Cartella salvata con successo' : 'cartella aggiornata');
+      return true;
+    } catch (err: any) {
+      alert('Errore durante il salvataggio della cartella: ' + err.message);
+      return false;
+    }
   }
   aggiungiMerce(cartella: Cartella) {
     const nuovaMerce: Merce = {

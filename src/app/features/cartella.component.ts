@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, inject, Input } from '@angular/core';
+import { Component, inject, Input, HostListener, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { CartellaService } from '../service/cartella.service';
@@ -26,6 +26,11 @@ import { Cartella } from '../models/cartella.model';
     <button id="addClientButton" (click)="aggiungiCliente()">
       {{ isPreventivi ? 'Aggiungi Preventivo' : 'Aggiungi Cliente' }}
     </button>
+
+    <div *ngIf="modificheNonSalvate()" class="avviso-non-salvato" role="status">
+      ⚠️ Ci sono modifiche non salvate. Premi <strong>Salva</strong> su ogni scheda per scriverle nel
+      file.
+    </div>
 
     <div *ngFor="let cartella of cartellePagina" class="container-cartelle">
       <div class="container-form">
@@ -95,8 +100,9 @@ import { Cartella } from '../models/cartella.model';
         <p *ngIf="srv.calculateTotal(cartella) !== 0">
           Totale: {{ srv.calculateTotal(cartella) | currency }}
         </p>
+        <p *ngIf="isDirty(cartella)" class="badge-non-salvato">● Modifiche non salvate</p>
         <div class="d-flex justify-content-between">
-          <button id="save" (click)="srv.save(cartella)">
+          <button id="save" [class.dirty]="isDirty(cartella)" (click)="salva(cartella)">
             {{ isPreventivi ? 'Salva Preventivo' : 'Salva Cartella' }}
           </button>
           <button *ngIf="cartella._id" (click)="stampa(cartella)">Stampa</button>
@@ -247,6 +253,24 @@ import { Cartella } from '../models/cartella.model';
 #save:hover{
   background-color:rgb(23, 122, 76);
 }
+#save.dirty{
+  box-shadow: 0 0 0 3px rgba(255, 193, 7, 0.6);
+}
+.badge-non-salvato{
+  color: #996500;
+  font-weight: 600;
+  font-size: 0.85rem;
+  margin: 0 0 0.25rem;
+}
+.avviso-non-salvato{
+  max-width: 800px;
+  margin: 0 auto 1rem;
+  background: #fff3cd;
+  border: 1px solid #ffe69c;
+  color: #664d03;
+  border-radius: 0.375rem;
+  padding: 0.6rem 0.9rem;
+}
 .container-form button.remove{
   background-color:  rgb(196, 46, 41)
 ;
@@ -291,7 +315,7 @@ import { Cartella } from '../models/cartella.model';
 
   `,
 })
-export class CartellaComponent {
+export class CartellaComponent implements OnInit {
   // 'cartelle' in home, 'preventivi' nella pagina Preventivi
   @Input() modalita: 'cartelle' | 'preventivi' = 'cartelle';
 
@@ -301,6 +325,57 @@ export class CartellaComponent {
   ricerca: string | undefined;
   readonly perPagina = 10;
   paginaCorrente = 1;
+
+  // Istantanea di ogni cartella com'era nel file: serve a capire cosa è stato
+  // modificato e non ancora salvato (confronto per _id)
+  private baseline = new Map<string, string>();
+
+  ngOnInit(): void {
+    this.aggiornaBaseline();
+  }
+
+  private istantanea(c: Cartella): string {
+    return JSON.stringify(c);
+  }
+
+  private aggiornaBaseline(): void {
+    this.baseline.clear();
+    for (const c of this.srv.cartelle) {
+      if (c._id) this.baseline.set(c._id, this.istantanea(c));
+    }
+  }
+
+  // Una cartella è "non salvata" se è nuova (senza _id) o diversa dal file
+  isDirty(cartella: Cartella): boolean {
+    if (!cartella._id) return true;
+    return this.baseline.get(cartella._id) !== this.istantanea(cartella);
+  }
+
+  // Modifiche non salvate fra gli elementi visibili in questa pagina (cartelle o preventivi)
+  modificheNonSalvate(): boolean {
+    return this.elenco.some((c) => this.isDirty(c));
+  }
+
+  // Modifiche non salvate ovunque (serve per bloccare la chiusura della scheda)
+  private haModificheNonSalvate(): boolean {
+    return this.srv.cartelle.some((c) => this.isDirty(c));
+  }
+
+  // Avvisa se si chiude/ricarica la pagina con modifiche non salvate
+  @HostListener('window:beforeunload', ['$event'])
+  bloccaChiusura(e: BeforeUnloadEvent): void {
+    if (this.haModificheNonSalvate()) {
+      e.preventDefault();
+      e.returnValue = '';
+    }
+  }
+
+  async salva(cartella: Cartella): Promise<void> {
+    if (await this.srv.save(cartella)) {
+      // salvata nel file: aggiorno l'istantanea così la scheda risulta "pulita"
+      if (cartella._id) this.baseline.set(cartella._id, this.istantanea(cartella));
+    }
+  }
 
   get isPreventivi(): boolean {
     return this.modalita === 'preventivi';
@@ -346,7 +421,7 @@ export class CartellaComponent {
     this.router.navigate(['/search'], { queryParams: { id: cartella._id } });
   }
 
-  converti(preventivo: Cartella) {
+  async converti(preventivo: Cartella) {
     const risposta = prompt('Numero cliente da assegnare alla nuova cartella:');
     if (risposta === null) return; // annullato
     const numero = Number(risposta);
@@ -354,9 +429,10 @@ export class CartellaComponent {
       alert('Inserisci un numero cliente valido');
       return;
     }
-    if (this.srv.convertiInCartella(preventivo, numero)) {
+    if (await this.srv.convertiInCartella(preventivo, numero)) {
       // il preventivo è diventato una cartella: lo tolgo anche dai risultati mostrati qui
       this.cartelleTrovate = this.cartelleTrovate.filter((c) => c !== preventivo);
+      if (preventivo._id) this.baseline.set(preventivo._id, this.istantanea(preventivo));
     }
   }
 
